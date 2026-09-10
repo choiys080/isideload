@@ -214,18 +214,26 @@ impl GrandSlam {
         #[cfg(not(feature = "wasm"))]
         let cert = Certificate::from_der(APPLE_ROOT)?;
         #[cfg(not(feature = "wasm"))]
-        let client = ClientBuilder::new()
-            .add_root_certificate(cert)
-            .http1_title_case_headers()
-            .danger_accept_invalid_certs(debug)
-            .connection_verbose(debug)
-            // Apple's GrandSlam edge (since ~2026-08-31) 503s/GoAways HTTP/2
-            // connections while still serving HTTP/1.1, and rate-limits reused
-            // connections. Force HTTP/1.1 (the path Apple still serves) and open a
-            // fresh connection per request (mirrors AltSign #52).
-            .http1_only()
-            .pool_max_idle_per_host(0)
-            .build()?;
+        let client = {
+            let builder = ClientBuilder::new()
+                .add_root_certificate(cert)
+                .http1_title_case_headers()
+                .danger_accept_invalid_certs(debug)
+                .connection_verbose(debug)
+                // Apple's GrandSlam edge (since ~2026-08-31) rejects the rustls TLS
+                // handshake (fingerprint / renegotiation) and 503s/GoAways HTTP/2
+                // while still serving HTTP/1.1. Force HTTP/1.1 + a fresh connection
+                // per request (mirrors AltSign #52).
+                .http1_only()
+                .pool_max_idle_per_host(0);
+            // On Windows the base [dependencies] `rustls-no-provider` feature unifies
+            // into this build, so reqwest silently defaults to rustls even though the
+            // cfg(windows) override asks for native-tls. Force schannel explicitly --
+            // it's the stack Apple's edge accepts.
+            #[cfg(windows)]
+            let builder = builder.use_native_tls();
+            builder.build()?
+        };
         #[cfg(feature = "wasm")]
         let client = ClientBuilder::new().build()?;
 
