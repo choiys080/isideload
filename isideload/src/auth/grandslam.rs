@@ -219,6 +219,10 @@ impl GrandSlam {
             .http1_title_case_headers()
             .danger_accept_invalid_certs(debug)
             .connection_verbose(debug)
+            // Apple's GrandSlam edge (since ~2026-08-31) serves only a couple of
+            // requests per TLS connection and 503s the rest. Disable idle-connection
+            // reuse so every request opens a fresh connection (mirrors AltSign #52).
+            .pool_max_idle_per_host(0)
             .build()?;
         #[cfg(feature = "wasm")]
         let client = ClientBuilder::new().build()?;
