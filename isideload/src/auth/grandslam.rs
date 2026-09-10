@@ -219,9 +219,11 @@ impl GrandSlam {
             .http1_title_case_headers()
             .danger_accept_invalid_certs(debug)
             .connection_verbose(debug)
-            // Apple's GrandSlam edge (since ~2026-08-31) serves only a couple of
-            // requests per TLS connection and 503s the rest. Disable idle-connection
-            // reuse so every request opens a fresh connection (mirrors AltSign #52).
+            // Apple's GrandSlam edge (since ~2026-08-31) 503s/GoAways HTTP/2
+            // connections while still serving HTTP/1.1, and rate-limits reused
+            // connections. Force HTTP/1.1 (the path Apple still serves) and open a
+            // fresh connection per request (mirrors AltSign #52).
+            .http1_only()
             .pool_max_idle_per_host(0)
             .build()?;
         #[cfg(feature = "wasm")]
